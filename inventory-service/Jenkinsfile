@@ -1,0 +1,64 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "inventory-service"
+        DOCKER_HUB_REPO = "aminebd14"
+        DOCKER_USERNAME = "aminebd14"
+        DOCKER_PASSWORD = "dckr_pat_JldbWHItHP63m3HMjBXFJGyS9Tg"
+        
+        
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                script {
+                    docker.image('maven:3.9.6-eclipse-temurin-17').inside {
+                        sh 'mvn clean package -DskipTests'
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                script {
+                    docker.image('maven:3.9.6-eclipse-temurin-17').inside {
+                        sh 'mvn test'
+                    }
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                dir('inventory-service') {
+                    sh "docker build -t $DOCKER_HUB_REPO/$IMAGE_NAME:latest ."
+                }
+            }
+        }
+
+        stage('Deploy to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-creds',
+                    usernameVariable: 'aminebd14',
+                    passwordVariable: 'dckr_pat_JldbWHItHP63m3HMjBXFJGyS9Tg'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker push $DOCKER_USERNAME/$IMAGE_NAME:latest
+                        docker logout
+                    '''
+                }
+            }
+        }
+    }
+}
